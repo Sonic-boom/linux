@@ -2027,7 +2027,7 @@ enum i915_power_well_id {
 #define _CNL_PORT_TX_DW5_LN0_AE		0x162454
 #define _CNL_PORT_TX_DW5_LN0_B		0x162654
 #define _CNL_PORT_TX_DW5_LN0_C		0x162C54
-#define _CNL_PORT_TX_DW5_LN0_D		0x162ED4
+#define _CNL_PORT_TX_DW5_LN0_D		0x162E54
 #define _CNL_PORT_TX_DW5_LN0_F		0x162854
 #define CNL_PORT_TX_DW5_GRP(port)	_MMIO_PORT6(port, \
 						    _CNL_PORT_TX_DW5_GRP_AE, \
@@ -2058,7 +2058,7 @@ enum i915_power_well_id {
 #define _CNL_PORT_TX_DW7_LN0_AE		0x16245C
 #define _CNL_PORT_TX_DW7_LN0_B		0x16265C
 #define _CNL_PORT_TX_DW7_LN0_C		0x162C5C
-#define _CNL_PORT_TX_DW7_LN0_D		0x162EDC
+#define _CNL_PORT_TX_DW7_LN0_D		0x162E5C
 #define _CNL_PORT_TX_DW7_LN0_F		0x16285C
 #define CNL_PORT_TX_DW7_GRP(port)	_MMIO_PORT6(port, \
 						    _CNL_PORT_TX_DW7_GRP_AE, \
@@ -2489,6 +2489,8 @@ enum i915_power_well_id {
 
 #define GEN8_FAULT_TLB_DATA0		_MMIO(0x4b10)
 #define GEN8_FAULT_TLB_DATA1		_MMIO(0x4b14)
+#define   FAULT_VA_HIGH_BITS		(0xf << 0)
+#define   FAULT_GTT_SEL			(1 << 4)
 
 #define FPGA_DBG		_MMIO(0x42300)
 #define   FPGA_DBG_RM_NOCLAIM	(1<<31)

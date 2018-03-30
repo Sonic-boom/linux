@@ -149,17 +149,6 @@ static void intel_breadcrumbs_fake_irq(struct timer_list *t)
 		return;
 
 	mod_timer(&b->fake_irq, jiffies + 1);
-
-	/* Ensure that even if the GPU hangs, we get woken up.
-	 *
-	 * However, note that if no one is waiting, we never notice
-	 * a gpu hang. Eventually, we will have to wait for a resource
-	 * held by the GPU and so trigger a hangcheck. In the most
-	 * pathological case, this will be upon memory starvation! To
-	 * prevent this, we also queue the hangcheck from the retire
-	 * worker.
-	 */
-	i915_queue_hangcheck(engine->i915);
 }
 
 static void irq_enable(struct intel_engine_cs *engine)
@@ -605,29 +594,16 @@ void intel_engine_remove_wait(struct intel_engine_cs *engine,
 	spin_unlock_irq(&b->rb_lock);
 }
 
-static bool signal_valid(const struct drm_i915_gem_request *request)
-{
-	return intel_wait_check_request(&request->signaling.wait, request);
-}
-
 static bool signal_complete(const struct drm_i915_gem_request *request)
 {
 	if (!request)
 		return false;
 
-	/* If another process served as the bottom-half it may have already
-	 * signalled that this wait is already completed.
-	 */
-	if (intel_wait_complete(&request->signaling.wait))
-		return signal_valid(request);
-
-	/* Carefully check if the request is complete, giving time for the
+	/*
+	 * Carefully check if the request is complete, giving time for the
 	 * seqno to be visible or if the GPU hung.
 	 */
-	if (__i915_request_irq_complete(request))
-		return true;
-
-	return false;
+	return __i915_request_irq_complete(request);
 }
 
 static struct drm_i915_gem_request *to_signaler(struct rb_node *rb)
@@ -670,9 +646,13 @@ static int intel_breadcrumbs_signaler(void *arg)
 			request = i915_gem_request_get_rcu(request);
 		rcu_read_unlock();
 		if (signal_complete(request)) {
-			local_bh_disable();
-			dma_fence_signal(&request->fence);
-			local_bh_enable(); /* kick start the tasklets */
+			if (!test_bit(DMA_FENCE_FLAG_SIGNALED_BIT,
+				      &request->fence.flags)) {
+				local_bh_disable();
+				dma_fence_signal(&request->fence);
+				GEM_BUG_ON(!i915_gem_request_completed(request));
+				local_bh_enable(); /* kick start the tasklets */
+			}
 
 			spin_lock_irq(&b->rb_lock);
 

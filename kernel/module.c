@@ -3804,6 +3804,7 @@ static int load_module(struct load_info *info, const char __user *uargs,
 	module_disable_nx(mod);
 
  ddebug_cleanup:
+	ftrace_release_mod(mod);
 	dynamic_debug_remove(mod, info->debug);
 	synchronize_sched();
 	kfree(mod->args);
@@ -3823,12 +3824,6 @@ static int load_module(struct load_info *info, const char __user *uargs,
 	synchronize_sched();
 	mutex_unlock(&module_mutex);
  free_module:
-	/*
-	 * Ftrace needs to clean up what it initialized.
-	 * This does nothing if ftrace_module_init() wasn't called,
-	 * but it must be called outside of module_mutex.
-	 */
-	ftrace_release_mod(mod);
 	/* Free lock-classes; relies on the preceding sync_rcu() */
 	lockdep_free_key_range(mod->core_layout.base, mod->core_layout.size);
 
@@ -4233,7 +4228,7 @@ static int modules_open(struct inode *inode, struct file *file)
 		m->private = kallsyms_show_value() ? NULL : (void *)8ul;
 	}
 
-	return 0;
+	return err;
 }
 
 static const struct file_operations proc_modules_operations = {

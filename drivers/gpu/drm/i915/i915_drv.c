@@ -1433,19 +1433,7 @@ void i915_driver_unload(struct drm_device *dev)
 
 	intel_modeset_cleanup(dev);
 
-	/*
-	 * free the memory space allocated for the child device
-	 * config parsed from VBT
-	 */
-	if (dev_priv->vbt.child_dev && dev_priv->vbt.child_dev_num) {
-		kfree(dev_priv->vbt.child_dev);
-		dev_priv->vbt.child_dev = NULL;
-		dev_priv->vbt.child_dev_num = 0;
-	}
-	kfree(dev_priv->vbt.sdvo_lvds_vbt_mode);
-	dev_priv->vbt.sdvo_lvds_vbt_mode = NULL;
-	kfree(dev_priv->vbt.lfp_lvds_vbt_mode);
-	dev_priv->vbt.lfp_lvds_vbt_mode = NULL;
+	intel_bios_cleanup(dev_priv);
 
 	vga_switcheroo_unregister_client(pdev);
 	vga_client_register(pdev, NULL, NULL, NULL);
@@ -1842,6 +1830,8 @@ static int i915_drm_resume_early(struct drm_device *dev)
 	if (IS_GEN9_LP(dev_priv) ||
 	    !(dev_priv->suspended_to_idle && dev_priv->csr.dmc_payload))
 		intel_power_domains_init_hw(dev_priv, true);
+	else
+		intel_display_set_init_power(dev_priv, true);
 
 	i915_gem_sanitize(dev_priv);
 

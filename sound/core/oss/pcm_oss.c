@@ -1762,10 +1762,9 @@ static int snd_pcm_oss_get_formats(struct snd_pcm_oss_file *pcm_oss_file)
 		return -ENOMEM;
 	_snd_pcm_hw_params_any(params);
 	err = snd_pcm_hw_refine(substream, params);
-	format_mask = hw_param_mask_c(params, SNDRV_PCM_HW_PARAM_FORMAT);
-	kfree(params);
 	if (err < 0)
-		return err;
+		goto error;
+	format_mask = hw_param_mask_c(params, SNDRV_PCM_HW_PARAM_FORMAT);
 	for (fmt = 0; fmt < 32; ++fmt) {
 		if (snd_mask_test(format_mask, fmt)) {
 			int f = snd_pcm_oss_format_to(fmt);
@@ -1773,7 +1772,10 @@ static int snd_pcm_oss_get_formats(struct snd_pcm_oss_file *pcm_oss_file)
 				formats |= f;
 		}
 	}
-	return formats;
+
+ error:
+	kfree(params);
+	return err < 0 ? err : formats;
 }
 
 static int snd_pcm_oss_set_format(struct snd_pcm_oss_file *pcm_oss_file, int format)
@@ -2705,7 +2707,7 @@ static __poll_t snd_pcm_oss_poll(struct file *file, poll_table * wait)
 		if (runtime->status->state != SNDRV_PCM_STATE_DRAINING &&
 		    (runtime->status->state != SNDRV_PCM_STATE_RUNNING ||
 		     snd_pcm_oss_playback_ready(psubstream)))
-			mask |= POLLOUT | POLLWRNORM;
+			mask |= EPOLLOUT | EPOLLWRNORM;
 		snd_pcm_stream_unlock_irq(psubstream);
 	}
 	if (csubstream != NULL) {
@@ -2715,7 +2717,7 @@ static __poll_t snd_pcm_oss_poll(struct file *file, poll_table * wait)
 		snd_pcm_stream_lock_irq(csubstream);
 		if ((ostate = runtime->status->state) != SNDRV_PCM_STATE_RUNNING ||
 		    snd_pcm_oss_capture_ready(csubstream))
-			mask |= POLLIN | POLLRDNORM;
+			mask |= EPOLLIN | EPOLLRDNORM;
 		snd_pcm_stream_unlock_irq(csubstream);
 		if (ostate != SNDRV_PCM_STATE_RUNNING && runtime->oss.trigger) {
 			struct snd_pcm_oss_file ofile;
