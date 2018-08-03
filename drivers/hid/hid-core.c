@@ -134,8 +134,11 @@ static int open_collection(struct hid_parser *parser, unsigned type)
 	}
 
 	if (parser->device->maxcollection == parser->device->collection_size) {
-		collection = kmalloc(sizeof(struct hid_collection) *
-				parser->device->collection_size * 2, GFP_KERNEL);
+		collection = kmalloc(
+				array3_size(sizeof(struct hid_collection),
+					    parser->device->collection_size,
+					    2),
+				GFP_KERNEL);
 		if (collection == NULL) {
 			hid_err(parser->device, "failed to reallocate collection array\n");
 			return -ENOMEM;
@@ -1278,7 +1281,7 @@ static void hid_input_field(struct hid_device *hid, struct hid_field *field,
 	__s32 max = field->logical_maximum;
 	__s32 *value;
 
-	value = kmalloc(sizeof(__s32) * count, GFP_ATOMIC);
+	value = kmalloc_array(count, sizeof(__s32), GFP_ATOMIC);
 	if (!value)
 		return;
 
@@ -1949,6 +1952,8 @@ static int hid_device_probe(struct device *dev)
 	}
 	hdev->io_started = false;
 
+	clear_bit(ffs(HID_STAT_REPROBED), &hdev->status);
+
 	if (!hdev->driver) {
 		id = hid_match_device(hdev, hdrv);
 		if (id == NULL) {
@@ -2212,7 +2217,8 @@ static int __hid_bus_reprobe_drivers(struct device *dev, void *data)
 	struct hid_device *hdev = to_hid_device(dev);
 
 	if (hdev->driver == hdrv &&
-	    !hdrv->match(hdev, hid_ignore_special_drivers))
+	    !hdrv->match(hdev, hid_ignore_special_drivers) &&
+	    !test_and_set_bit(ffs(HID_STAT_REPROBED), &hdev->status))
 		return device_reprobe(dev);
 
 	return 0;

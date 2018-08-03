@@ -591,12 +591,14 @@ static void qla24xx_handle_gnl_done_event(scsi_qla_host_t *vha,
 				conflict_fcport =
 					qla2x00_find_fcport_by_wwpn(vha,
 					    e->port_name, 0);
-				ql_dbg(ql_dbg_disc, vha, 0x20e6,
-				    "%s %d %8phC post del sess\n",
-				    __func__, __LINE__,
-				    conflict_fcport->port_name);
-				qlt_schedule_sess_for_deletion
-					(conflict_fcport);
+				if (conflict_fcport) {
+					qlt_schedule_sess_for_deletion
+						(conflict_fcport);
+					ql_dbg(ql_dbg_disc, vha, 0x20e6,
+					    "%s %d %8phC post del sess\n",
+					    __func__, __LINE__,
+					    conflict_fcport->port_name);
+				}
 			}
 
 			/* FW already picked this loop id for another fcport */
@@ -1487,11 +1489,10 @@ qla2x00_async_tm_cmd(fc_port_t *fcport, uint32_t flags, uint32_t lun,
 
 	wait_for_completion(&tm_iocb->u.tmf.comp);
 
-	rval = tm_iocb->u.tmf.comp_status == CS_COMPLETE ?
-	    QLA_SUCCESS : QLA_FUNCTION_FAILED;
+	rval = tm_iocb->u.tmf.data;
 
-	if ((rval != QLA_SUCCESS) || tm_iocb->u.tmf.data) {
-		ql_dbg(ql_dbg_taskm, vha, 0x8030,
+	if (rval != QLA_SUCCESS) {
+		ql_log(ql_log_warn, vha, 0x8030,
 		    "TM IOCB failed (%x).\n", rval);
 	}
 
@@ -3089,8 +3090,9 @@ qla2x00_alloc_outstanding_cmds(struct qla_hw_data *ha, struct req_que *req)
 			req->num_outstanding_cmds = ha->cur_fw_iocb_count;
 	}
 
-	req->outstanding_cmds = kzalloc(sizeof(srb_t *) *
-	    req->num_outstanding_cmds, GFP_KERNEL);
+	req->outstanding_cmds = kcalloc(req->num_outstanding_cmds,
+					sizeof(srb_t *),
+					GFP_KERNEL);
 
 	if (!req->outstanding_cmds) {
 		/*
@@ -3098,8 +3100,9 @@ qla2x00_alloc_outstanding_cmds(struct qla_hw_data *ha, struct req_que *req)
 		 * initialization.
 		 */
 		req->num_outstanding_cmds = MIN_OUTSTANDING_COMMANDS;
-		req->outstanding_cmds = kzalloc(sizeof(srb_t *) *
-		    req->num_outstanding_cmds, GFP_KERNEL);
+		req->outstanding_cmds = kcalloc(req->num_outstanding_cmds,
+						sizeof(srb_t *),
+						GFP_KERNEL);
 
 		if (!req->outstanding_cmds) {
 			ql_log(ql_log_fatal, NULL, 0x0126,
@@ -5007,7 +5010,8 @@ qla2x00_iidma_fcport(scsi_qla_host_t *vha, fc_port_t *fcport)
 		return;
 
 	if (fcport->fp_speed == PORT_SPEED_UNKNOWN ||
-	    fcport->fp_speed > ha->link_data_rate)
+	    fcport->fp_speed > ha->link_data_rate ||
+	    !ha->flags.gpsc_supported)
 		return;
 
 	rval = qla2x00_set_idma_speed(vha, fcport->loop_id, fcport->fp_speed,

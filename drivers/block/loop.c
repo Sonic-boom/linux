@@ -524,7 +524,8 @@ static int lo_rw_aio(struct loop_device *lo, struct loop_cmd *cmd,
 
 		__rq_for_each_bio(bio, rq)
 			segments += bio_segments(bio);
-		bvec = kmalloc(sizeof(struct bio_vec) * segments, GFP_NOIO);
+		bvec = kmalloc_array(segments, sizeof(struct bio_vec),
+				     GFP_NOIO);
 		if (!bvec)
 			return -EIO;
 		cmd->bvec = bvec;
@@ -1612,6 +1613,7 @@ static int lo_compat_ioctl(struct block_device *bdev, fmode_t mode,
 		arg = (unsigned long) compat_ptr(arg);
 	case LOOP_SET_FD:
 	case LOOP_CHANGE_FD:
+	case LOOP_SET_BLOCK_SIZE:
 		err = lo_ioctl(bdev, mode, cmd, arg);
 		break;
 	default:

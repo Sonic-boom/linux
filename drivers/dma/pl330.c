@@ -1866,7 +1866,7 @@ static int dmac_alloc_threads(struct pl330_dmac *pl330)
 	int i;
 
 	/* Allocate 1 Manager and 'chans' Channel threads */
-	pl330->channels = kzalloc((1 + chans) * sizeof(*thrd),
+	pl330->channels = kcalloc(1 + chans, sizeof(*thrd),
 					GFP_KERNEL);
 	if (!pl330->channels)
 		return -ENOMEM;
@@ -2990,7 +2990,7 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
 
 	pl330->num_peripherals = num_chan;
 
-	pl330->peripherals = kzalloc(num_chan * sizeof(*pch), GFP_KERNEL);
+	pl330->peripherals = kcalloc(num_chan, sizeof(*pch), GFP_KERNEL);
 	if (!pl330->peripherals) {
 		ret = -ENOMEM;
 		goto probe_err2;
@@ -3033,7 +3033,7 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
 	pd->src_addr_widths = PL330_DMA_BUSWIDTHS;
 	pd->dst_addr_widths = PL330_DMA_BUSWIDTHS;
 	pd->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
-	pd->residue_granularity = DMA_RESIDUE_GRANULARITY_SEGMENT;
+	pd->residue_granularity = DMA_RESIDUE_GRANULARITY_BURST;
 	pd->max_burst = ((pl330->quirks & PL330_QUIRK_BROKEN_NO_FLUSHP) ?
 			 1 : PL330_MAX_BURST);
 

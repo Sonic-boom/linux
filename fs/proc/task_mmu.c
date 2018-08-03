@@ -831,7 +831,8 @@ static int show_smap(struct seq_file *m, void *v, int is_pid)
 		SEQ_PUT_DEC(" kB\nSwap:           ", mss->swap);
 		SEQ_PUT_DEC(" kB\nSwapPss:        ",
 						mss->swap_pss >> PSS_SHIFT);
-		SEQ_PUT_DEC(" kB\nLocked:         ", mss->pss >> PSS_SHIFT);
+		SEQ_PUT_DEC(" kB\nLocked:         ",
+						mss->pss_locked >> PSS_SHIFT);
 		seq_puts(m, " kB\n");
 	}
 	if (!rollup_mode) {
@@ -1473,7 +1474,7 @@ static ssize_t pagemap_read(struct file *file, char __user *buf,
 	pm.show_pfn = file_ns_capable(file, &init_user_ns, CAP_SYS_ADMIN);
 
 	pm.len = (PAGEMAP_WALK_SIZE >> PAGE_SHIFT);
-	pm.buffer = kmalloc(pm.len * PM_ENTRY_BYTES, GFP_KERNEL);
+	pm.buffer = kmalloc_array(pm.len, PM_ENTRY_BYTES, GFP_KERNEL);
 	ret = -ENOMEM;
 	if (!pm.buffer)
 		goto out_mm;

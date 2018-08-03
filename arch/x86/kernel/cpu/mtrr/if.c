@@ -43,7 +43,7 @@ mtrr_file_add(unsigned long base, unsigned long size,
 
 	max = num_var_ranges;
 	if (fcount == NULL) {
-		fcount = kzalloc(max * sizeof *fcount, GFP_KERNEL);
+		fcount = kcalloc(max, sizeof(*fcount), GFP_KERNEL);
 		if (!fcount)
 			return -ENOMEM;
 		FILE_FCOUNT(file) = fcount;
@@ -106,7 +106,8 @@ mtrr_write(struct file *file, const char __user *buf, size_t len, loff_t * ppos)
 
 	memset(line, 0, LINE_SIZE);
 
-	length = strncpy_from_user(line, buf, LINE_SIZE - 1);
+	len = min_t(size_t, len, LINE_SIZE - 1);
+	length = strncpy_from_user(line, buf, len);
 	if (length < 0)
 		return length;
 

@@ -118,7 +118,7 @@ struct task_group;
  * the comment with set_special_state().
  */
 #define is_special_task_state(state)				\
-	((state) & (__TASK_STOPPED | __TASK_TRACED | TASK_DEAD))
+	((state) & (__TASK_STOPPED | __TASK_TRACED | TASK_PARKED | TASK_DEAD))
 
 #define __set_current_state(state_value)			\
 	do {							\
@@ -742,7 +742,7 @@ struct task_struct {
 	pid_t				pid;
 	pid_t				tgid;
 
-#ifdef CONFIG_CC_STACKPROTECTOR
+#ifdef CONFIG_STACKPROTECTOR
 	/* Canary value for the -fstack-protector GCC feature: */
 	unsigned long			stack_canary;
 #endif
@@ -1130,7 +1130,7 @@ struct task_struct {
 
 #ifdef CONFIG_KCOV
 	/* Coverage collection mode enabled for this task (0 if disabled): */
-	enum kcov_mode			kcov_mode;
+	unsigned int			kcov_mode;
 
 	/* Size of the kcov_area: */
 	unsigned int			kcov_size;
@@ -1639,6 +1639,12 @@ static inline void clear_tsk_thread_flag(struct task_struct *tsk, int flag)
 	clear_ti_thread_flag(task_thread_info(tsk), flag);
 }
 
+static inline void update_tsk_thread_flag(struct task_struct *tsk, int flag,
+					  bool value)
+{
+	update_ti_thread_flag(task_thread_info(tsk), flag, value);
+}
+
 static inline int test_and_set_tsk_thread_flag(struct task_struct *tsk, int flag)
 {
 	return test_and_set_ti_thread_flag(task_thread_info(tsk), flag);
@@ -1793,20 +1799,22 @@ static inline void rseq_set_notify_resume(struct task_struct *t)
 		set_tsk_thread_flag(t, TIF_NOTIFY_RESUME);
 }
 
-void __rseq_handle_notify_resume(struct pt_regs *regs);
+void __rseq_handle_notify_resume(struct ksignal *sig, struct pt_regs *regs);
 
-static inline void rseq_handle_notify_resume(struct pt_regs *regs)
+static inline void rseq_handle_notify_resume(struct ksignal *ksig,
+					     struct pt_regs *regs)
 {
 	if (current->rseq)
-		__rseq_handle_notify_resume(regs);
+		__rseq_handle_notify_resume(ksig, regs);
 }
 
-static inline void rseq_signal_deliver(struct pt_regs *regs)
+static inline void rseq_signal_deliver(struct ksignal *ksig,
+				       struct pt_regs *regs)
 {
 	preempt_disable();
 	__set_bit(RSEQ_EVENT_SIGNAL_BIT, &current->rseq_event_mask);
 	preempt_enable();
-	rseq_handle_notify_resume(regs);
+	rseq_handle_notify_resume(ksig, regs);
 }
 
 /* rseq_preempt() requires preemption to be disabled. */
@@ -1825,9 +1833,7 @@ static inline void rseq_migrate(struct task_struct *t)
 
 /*
  * If parent process has a registered restartable sequences area, the
- * child inherits. Only applies when forking a process, not a thread. In
- * case a parent fork() in the middle of a restartable sequence, set the
- * resume notifier to force the child to retry.
+ * child inherits. Only applies when forking a process, not a thread.
  */
 static inline void rseq_fork(struct task_struct *t, unsigned long clone_flags)
 {
@@ -1841,7 +1847,6 @@ static inline void rseq_fork(struct task_struct *t, unsigned long clone_flags)
 		t->rseq_len = current->rseq_len;
 		t->rseq_sig = current->rseq_sig;
 		t->rseq_event_mask = current->rseq_event_mask;
-		rseq_preempt(t);
 	}
 }
 
@@ -1858,10 +1863,12 @@ static inline void rseq_execve(struct task_struct *t)
 static inline void rseq_set_notify_resume(struct task_struct *t)
 {
 }
-static inline void rseq_handle_notify_resume(struct pt_regs *regs)
+static inline void rseq_handle_notify_resume(struct ksignal *ksig,
+					     struct pt_regs *regs)
 {
 }
-static inline void rseq_signal_deliver(struct pt_regs *regs)
+static inline void rseq_signal_deliver(struct ksignal *ksig,
+				       struct pt_regs *regs)
 {
 }
 static inline void rseq_preempt(struct task_struct *t)

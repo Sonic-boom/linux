@@ -6,7 +6,7 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  *
- * Standard functionality for the common clock API.  See Documentation/clk.txt
+ * Standard functionality for the common clock API.  See Documentation/driver-api/clk.rst
  */
 
 #include <linux/clk.h>
@@ -24,7 +24,6 @@
 #include <linux/pm_runtime.h>
 #include <linux/sched.h>
 #include <linux/clkdev.h>
-#include <linux/stringify.h>
 
 #include "clk.h"
 
@@ -2559,7 +2558,7 @@ static const struct {
 	unsigned long flag;
 	const char *name;
 } clk_flags[] = {
-#define ENTRY(f) { f, __stringify(f) }
+#define ENTRY(f) { f, #f }
 	ENTRY(CLK_SET_RATE_GATE),
 	ENTRY(CLK_SET_PARENT_GATE),
 	ENTRY(CLK_SET_RATE_PARENT),
@@ -2747,7 +2746,7 @@ static int __clk_core_init(struct clk_core *core)
 		goto out;
 	}
 
-	/* check that clk_ops are sane.  See Documentation/clk.txt */
+	/* check that clk_ops are sane.  See Documentation/driver-api/clk.rst */
 	if (core->ops->set_rate &&
 	    !((core->ops->round_rate || core->ops->determine_rate) &&
 	      core->ops->recalc_rate)) {

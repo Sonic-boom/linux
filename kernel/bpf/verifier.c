@@ -5206,7 +5206,8 @@ static int adjust_insn_aux_data(struct bpf_verifier_env *env, u32 prog_len,
 
 	if (cnt == 1)
 		return 0;
-	new_data = vzalloc(sizeof(struct bpf_insn_aux_data) * prog_len);
+	new_data = vzalloc(array_size(prog_len,
+				      sizeof(struct bpf_insn_aux_data)));
 	if (!new_data)
 		return -ENOMEM;
 	memcpy(new_data, old_data, sizeof(struct bpf_insn_aux_data) * off);
@@ -5429,6 +5430,10 @@ static int jit_subprogs(struct bpf_verifier_env *env)
 		if (insn->code != (BPF_JMP | BPF_CALL) ||
 		    insn->src_reg != BPF_PSEUDO_CALL)
 			continue;
+		/* Upon error here we cannot fall back to interpreter but
+		 * need a hard reject of the program. Thus -EFAULT is
+		 * propagated in any case.
+		 */
 		subprog = find_subprog(env, i + insn->imm + 1);
 		if (subprog < 0) {
 			WARN_ONCE(1, "verifier bug. No program starts at insn %d\n",
@@ -5447,9 +5452,9 @@ static int jit_subprogs(struct bpf_verifier_env *env)
 		insn->imm = 1;
 	}
 
-	func = kzalloc(sizeof(prog) * env->subprog_cnt, GFP_KERNEL);
+	func = kcalloc(env->subprog_cnt, sizeof(prog), GFP_KERNEL);
 	if (!func)
-		return -ENOMEM;
+		goto out_undo_insn;
 
 	for (i = 0; i < env->subprog_cnt; i++) {
 		subprog_start = subprog_end;
@@ -5514,7 +5519,7 @@ static int jit_subprogs(struct bpf_verifier_env *env)
 		tmp = bpf_int_jit_compile(func[i]);
 		if (tmp != func[i] || func[i]->bpf_func != old_bpf_func) {
 			verbose(env, "JIT doesn't support bpf-to-bpf calls\n");
-			err = -EFAULT;
+			err = -ENOTSUPP;
 			goto out_free;
 		}
 		cond_resched();
@@ -5551,6 +5556,7 @@ out_free:
 		if (func[i])
 			bpf_jit_free(func[i]);
 	kfree(func);
+out_undo_insn:
 	/* cleanup main prog to be interpreted */
 	prog->jit_requested = 0;
 	for (i = 0, insn = prog->insnsi; i < prog->len; i++, insn++) {
@@ -5577,6 +5583,8 @@ static int fixup_call_args(struct bpf_verifier_env *env)
 		err = jit_subprogs(env);
 		if (err == 0)
 			return 0;
+		if (err == -EFAULT)
+			return err;
 	}
 #ifndef CONFIG_BPF_JIT_ALWAYS_ON
 	for (i = 0; i < prog->len; i++, insn++) {
@@ -5870,8 +5878,9 @@ int bpf_check(struct bpf_prog **prog, union bpf_attr *attr)
 		return -ENOMEM;
 	log = &env->log;
 
-	env->insn_aux_data = vzalloc(sizeof(struct bpf_insn_aux_data) *
-				     (*prog)->len);
+	env->insn_aux_data =
+		vzalloc(array_size(sizeof(struct bpf_insn_aux_data),
+				   (*prog)->len));
 	ret = -ENOMEM;
 	if (!env->insn_aux_data)
 		goto err_free_env;
